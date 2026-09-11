@@ -678,6 +678,8 @@ The following command line options are available for the `start` command:
 
 Passing the GitHub token on the command line exposes it to every local user through the process list, so prefer the `COPILOT_API_GITHUB_TOKEN` environment variable. The gateway resolves the token in this order: `--github-token` → `COPILOT_API_GITHUB_TOKEN` → the token file written by `auth login`.
 
+To replace the machine identifiers sent in Copilot request headers, set `COPILOT_API_VSCODE_MACHINE_ID` and `COPILOT_API_EDITOR_DEVICE_ID`. Non-empty values override the MAC-derived `vscode-machineid` and persisted `editor-device-id`, respectively. Keep the values stable if Copilot session continuity matters; a random 64-character hexadecimal value and a random UUID match the default formats.
+
 ### Auth Command Options
 
 | Option       | Description               | Default | Alias |

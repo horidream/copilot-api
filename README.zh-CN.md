@@ -720,6 +720,8 @@ Copilot API 现在使用子命令结构，主要命令包括：
 
 不建议把 GitHub token 放在命令行上：本机任意用户都能从进程列表里读到它，请优先使用 `COPILOT_API_GITHUB_TOKEN` 环境变量。token 的解析顺序为：`--github-token` → `COPILOT_API_GITHUB_TOKEN` → `auth login` 写入的 token 文件。
 
+如需替换 Copilot 请求头中发送的机器标识，请设置 `COPILOT_API_VSCODE_MACHINE_ID` 和 `COPILOT_API_EDITOR_DEVICE_ID`。非空值会分别覆盖由 MAC 地址生成的 `vscode-machineid` 和持久化的 `editor-device-id`。如果 Copilot 会话连续性很重要，请保持这些值稳定；随机的 64 位十六进制值和随机 UUID 与默认格式一致。
+
 ### Auth 命令选项
 
 | 选项 | 说明 | 默认值 | 别名 |
