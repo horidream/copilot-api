@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@jeffreycao/copilot-api",
-  "version": "2.5.7",
+  "version": "2.6.2",
   "description": "GitHub Copilot, OpenAI Codex, OpenCode Go, and third-party AI provider gateway with OpenAI and Anthropic API compatibility.",
   "keywords": [
     "github-copilot",
@@ -90,8 +90,7 @@
     "simple-git-hooks": "^2.13.1",
     "tsdown": "^0.23.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.41.0",
-    "unrun": "^0.3.1"
+    "typescript-eslint": "^8.41.0"
   },
   "engines": {
     "node": ">=22.13.0"
