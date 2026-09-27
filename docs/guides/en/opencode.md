@@ -68,7 +68,7 @@ Example `~/.config/opencode/opencode.json`:
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
-          },          
+          },
           "limit": {
             "context": 200000,
             "output": 32000
