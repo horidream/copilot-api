@@ -6,6 +6,14 @@ import { getVSCodeDeviceId } from "~/lib/deviceid"
 import { state } from "~/lib/state"
 import { getVSCodeVersion } from "~/services/get-vscode-version"
 
+export const VSCODE_MACHINE_ID_ENV = "COPILOT_API_VSCODE_MACHINE_ID"
+export const EDITOR_DEVICE_ID_ENV = "COPILOT_API_EDITOR_DEVICE_ID"
+
+const getEnvironmentOverride = (name: string): string | undefined => {
+  const value = process.env[name]?.trim()
+  return value || undefined
+}
+
 export const cacheVSCodeVersion = async () => {
   const response = await getVSCodeVersion()
   state.vsCodeVersion = response
@@ -41,6 +49,13 @@ export function getMac(): string | null {
 }
 
 export const cacheMacMachineId = () => {
+  const override = getEnvironmentOverride(VSCODE_MACHINE_ID_ENV)
+  if (override) {
+    state.macMachineId = override
+    consola.debug(`Using machine ID from ${VSCODE_MACHINE_ID_ENV}`)
+    return
+  }
+
   const macAddress = getMac() ?? randomUUID()
   state.macMachineId = createHash("sha256")
     .update(macAddress, "utf8")
@@ -49,6 +64,13 @@ export const cacheMacMachineId = () => {
 }
 
 export const cacheVsCodeDeviceId = async () => {
+  const override = getEnvironmentOverride(EDITOR_DEVICE_ID_ENV)
+  if (override) {
+    state.vsCodeDeviceId = override
+    consola.debug(`Using VSCode device ID from ${EDITOR_DEVICE_ID_ENV}`)
+    return
+  }
+
   state.vsCodeDeviceId = await getVSCodeDeviceId()
   consola.debug(`Using VSCode device ID: ${state.vsCodeDeviceId}`)
 }
