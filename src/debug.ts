@@ -6,8 +6,15 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import { fileURLToPath } from "node:url"
 
+import { isOpencodeOauthApp } from "./lib/api-config"
 import { getRawProviderConfig, listEnabledProviders } from "./lib/config"
+import { readGitHubToken } from "./lib/credential-store"
 import { PATHS } from "./lib/paths"
+import { state } from "./lib/state"
+import {
+  getCopilotToken,
+  type GetCopilotTokenResponse,
+} from "./services/github/get-copilot-token"
 
 interface DebugInfo {
   providers: {
@@ -126,19 +133,109 @@ export async function runDebug(options: RunDebugOptions): Promise<void> {
   }
 }
 
+export interface CopilotTokenDebugInfo {
+  token: string
+  expiresAt: number
+  expiresAtIso: string
+  refreshIn: number
+  apiEndpoint?: string
+}
+
+interface RunDebugTokenDependencies {
+  getCopilotToken: () => Promise<GetCopilotTokenResponse>
+  readGitHubToken: () => Promise<string | null>
+}
+
+const defaultDebugTokenDependencies: RunDebugTokenDependencies = {
+  getCopilotToken,
+  readGitHubToken,
+}
+
+export function toCopilotTokenDebugInfo(
+  response: GetCopilotTokenResponse,
+): CopilotTokenDebugInfo {
+  return {
+    token: response.token,
+    expiresAt: response.expires_at,
+    expiresAtIso: new Date(response.expires_at * 1000).toISOString(),
+    refreshIn: response.refresh_in,
+    apiEndpoint: response.endpoints?.api,
+  }
+}
+
+// Performs a one-off token exchange with the stored GitHub token. The result is
+// not shared with a running server, which keeps its own in-memory token.
+export async function runDebugToken(
+  options: RunDebugOptions,
+  dependencies: RunDebugTokenDependencies = defaultDebugTokenDependencies,
+): Promise<CopilotTokenDebugInfo> {
+  if (isOpencodeOauthApp()) {
+    throw new Error(
+      "opencode OAuth uses the GitHub token directly; there is no Copilot token to refresh",
+    )
+  }
+
+  const githubToken = await dependencies.readGitHubToken()
+  if (!githubToken) {
+    throw new Error(
+      `GitHub token not found at ${PATHS.GITHUB_TOKEN_PATH}. Run \`copilot-api auth login --provider copilot\` first.`,
+    )
+  }
+  state.githubToken = githubToken
+
+  const info = toCopilotTokenDebugInfo(await dependencies.getCopilotToken())
+
+  if (options.json) {
+    console.log(JSON.stringify(info, null, 2))
+  } else {
+    const secondsLeft = info.expiresAt - Math.floor(Date.now() / 1000)
+    consola.info(`Copilot token refreshed
+
+Token: ${info.token}
+Expires at: ${info.expiresAtIso} (${info.expiresAt}, in ${secondsLeft}s)
+Refresh in: ${info.refreshIn}s
+API endpoint: ${info.apiEndpoint ?? "n/a"}`)
+  }
+
+  return info
+}
+
+const jsonArg = {
+  json: {
+    type: "boolean",
+    default: false,
+    description: "Output debug information as JSON",
+  },
+} as const
+
+const debugToken = defineCommand({
+  meta: {
+    name: "token",
+    description:
+      "Exchange the stored GitHub token for a fresh Copilot token and print it",
+  },
+  args: jsonArg,
+  async run({ args }) {
+    const tlsModule = await import("./lib/tls")
+    tlsModule.enableSystemCACompat()
+    await runDebugToken({ json: args.json })
+  },
+})
+
 export const debug = defineCommand({
   meta: {
     name: "debug",
     description: "Print debug information about the application",
   },
-  args: {
-    json: {
-      type: "boolean",
-      default: false,
-      description: "Output debug information as JSON",
-    },
+  args: jsonArg,
+  subCommands: {
+    token: debugToken,
   },
   run({ args }) {
+    if ((args._[0] ?? "").trim()) {
+      return
+    }
+
     return runDebug({
       json: args.json,
     })
