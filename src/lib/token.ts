@@ -325,12 +325,52 @@ export const applyCopilotTokenResponse = (
   }
 }
 
+// Copilot tokens are `;`-separated `key=value` fields; `exp` holds the expiry
+// in Unix seconds.
+export const parseCopilotTokenExpiry = (token: string): number | undefined => {
+  const match = /(?:^|;)exp=(\d+)(?:;|$)/.exec(token)
+  return match ? Number(match[1]) : undefined
+}
+
+// Builds a token exchange response for a token obtained elsewhere (e.g. from
+// `copilot-api debug token`) so the refresh loop can schedule its replacement.
+export const toPrefilledCopilotTokenResponse = (
+  token: string,
+  nowMs: number = Date.now(),
+): GetCopilotTokenResponse => {
+  const expiresAt = parseCopilotTokenExpiry(token)
+  if (expiresAt === undefined) {
+    throw new Error(
+      "Prefilled Copilot token has no exp field; cannot determine when it expires",
+    )
+  }
+
+  const refreshIn = expiresAt - Math.floor(nowMs / 1000)
+  if (refreshIn <= 0) {
+    throw new Error(
+      `Prefilled Copilot token expired at ${new Date(expiresAt * 1000).toISOString()}`,
+    )
+  }
+
+  return { token, expires_at: expiresAt, refresh_in: refreshIn }
+}
+
+export interface SetupCopilotTokenOptions {
+  prefilledToken?: string
+}
+
 export const setupCopilotToken = async (
   dependencies: CopilotTokenDependencies = defaultCopilotTokenDependencies,
+  options: SetupCopilotTokenOptions = {},
 ) => {
   assertGitHubCopilotEnabled()
   if (isOpencodeOauthApp()) {
     if (!state.githubToken) throw new Error(`opencode token not found`)
+    if (options.prefilledToken) {
+      consola.warn(
+        "Ignoring prefilled Copilot token: opencode OAuth uses the GitHub token directly",
+      )
+    }
 
     state.copilotToken = state.githubToken
 
@@ -343,11 +383,18 @@ export const setupCopilotToken = async (
     return
   }
 
-  const response = await dependencies.getCopilotToken()
+  const response =
+    options.prefilledToken ?
+      toPrefilledCopilotTokenResponse(options.prefilledToken)
+    : await dependencies.getCopilotToken()
   applyCopilotTokenResponse(response)
 
   // Display the Copilot token to the screen
-  consola.debug("GitHub Copilot Token fetched successfully!")
+  consola.debug(
+    options.prefilledToken ?
+      `Using prefilled Copilot token (expires ${new Date(response.expires_at * 1000).toISOString()})`
+    : "GitHub Copilot Token fetched successfully!",
+  )
   if (state.showToken) {
     consola.info("Copilot token:", state.copilotToken)
   }

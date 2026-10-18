@@ -417,6 +417,14 @@ export function readGitHubTokenFromEnv(): string | undefined {
   return process.env[GITHUB_TOKEN_ENV]?.trim() || undefined
 }
 
+// A Copilot token obtained elsewhere (e.g. `copilot-api debug token`) that the
+// server uses until its first refresh instead of exchanging the GitHub token.
+export const COPILOT_TOKEN_ENV = "COPILOT_API_COPILOT_TOKEN"
+
+export function readCopilotTokenFromEnv(): string | undefined {
+  return process.env[COPILOT_TOKEN_ENV]?.trim() || undefined
+}
+
 export async function writeGitHubToken(token: string): Promise<void> {
   await writeProtectedFile(PATHS.GITHUB_TOKEN_PATH, token.trim())
 }

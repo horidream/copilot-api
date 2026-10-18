@@ -9,7 +9,9 @@ import { isGitHubCopilotEnabled } from "./lib/github-copilot-provider"
 import { listEnabledProviders, mergeConfigWithDefaults } from "./lib/config"
 import { setupCopilotRuntime } from "~/lib/copilot-runtime"
 import {
+  COPILOT_TOKEN_ENV,
   GITHUB_TOKEN_ENV,
+  readCopilotTokenFromEnv,
   readGitHubToken,
   readGitHubTokenFromEnv,
 } from "./lib/credential-store"
@@ -33,6 +35,7 @@ interface RunServerOptions {
   port: number
   verbose: boolean
   githubToken?: string
+  copilotToken?: string
   showToken: boolean
   proxyEnv: boolean
 }
@@ -59,6 +62,7 @@ async function resolveGitHubToken(
 async function setupCopilotMode(
   githubToken: string,
   source: GitHubTokenSource,
+  prefilledCopilotToken?: string,
 ): Promise<void> {
   state.githubTokenSource = source
   consola.info(
@@ -68,7 +72,9 @@ async function setupCopilotMode(
     : "Using GitHub token from local file",
   )
 
-  await setupCopilotRuntime(githubToken)
+  await setupCopilotRuntime(githubToken, {
+    prefilledToken: prefilledCopilotToken,
+  })
 }
 
 async function setupProviderMode(): Promise<void> {
@@ -145,12 +151,20 @@ export async function runServer(options: RunServerOptions): Promise<void> {
     isGitHubCopilotEnabled() ?
       await resolveGitHubToken(options.githubToken)
     : null
+  const prefilledCopilotToken =
+    options.copilotToken?.trim() || readCopilotTokenFromEnv()
   if (resolvedGitHubToken && isGitHubCopilotEnabled()) {
     await setupCopilotMode(
       resolvedGitHubToken.token,
       resolvedGitHubToken.source,
+      prefilledCopilotToken,
     )
   } else {
+    if (prefilledCopilotToken) {
+      consola.warn(
+        "Ignoring prefilled Copilot token: GitHub Copilot needs a GitHub token to refresh it",
+      )
+    }
     await setupProviderMode()
   }
 
@@ -200,6 +214,10 @@ export const start = defineCommand({
       description:
         "Provide GitHub token directly (must be generated using the `auth` subcommand)",
     },
+    "copilot-token": {
+      type: "string",
+      description: `Use this Copilot token (e.g. from \`debug token\`) until its first refresh instead of exchanging the GitHub token; prefer the ${COPILOT_TOKEN_ENV} environment variable`,
+    },
     "show-token": {
       type: "boolean",
       default: false,
@@ -217,6 +235,7 @@ export const start = defineCommand({
       port: Number.parseInt(args.port, 10),
       verbose: args.verbose,
       githubToken: args["github-token"],
+      copilotToken: args["copilot-token"],
       showToken: args["show-token"],
       proxyEnv: args["proxy-env"],
     })
